@@ -34,16 +34,36 @@ eval-set size (paired bootstrap, Holm-corrected across comparisons — see
 | LoRA, rank 8 | **81.6%** | 1 |
 | LoRA, rank 16 | **83.9%** | 1 |
 | LoRA, rank 32 | **87.0%** | 1 |
+| LoRA, rank 64 | **87.9%** | 1 |
 
-**Rank matters here, all the way up to 32.** Rank 8 beats rank 4 by
-**+3.3 points** (78.3% vs. 81.6%, aggregate two-proportion z-test, z=3.23,
-p=0.0013 — the true per-item array for the original rank=4 Kaggle run was
-lost to a session ending before download, so only an aggregate comparison
-is possible there). Rank 16 beats rank 8 by **+2.3 points** [+1.3, +3.3],
-and rank 32 beats rank 16 by a further **+3.2 points** [+2.2, +4.1] — both
-Holm-corrected paired bootstraps on real per-item data, genuinely
-significant, using the project's actual designed methodology. Accuracy is
-still climbing at rank 32; rank 64 remains untested.
+**Full rank grid complete.** Rank 8 beats rank 4 by **+3.3 points** (78.3%
+vs. 81.6%, aggregate two-proportion z-test, z=3.23, p=0.0013 — the true
+per-item array for the original rank=4 Kaggle run was lost to a session
+ending before download, so only an aggregate comparison is possible there).
+From there, every step is a Holm-corrected paired bootstrap on real
+per-item data: rank 16 beats rank 8 by **+2.3 points** [+1.3, +3.3], rank
+32 beats rank 16 by **+3.2 points** [+2.2, +4.1] — both genuinely
+significant — but **rank 64 does *not* significantly beat rank 32**
+(+0.8 points [-0.03, +1.7]). Accuracy plateaus around rank 32: rank 64
+costs exactly 2x the trainable parameters (8.7M vs. 4.4M) for a gain that
+doesn't clear statistical significance. Rank 32 is the practical ceiling
+for this task, not rank 64.
+
+### Data efficiency (rank 8, varying training-set fraction)
+
+| train fraction | accuracy | unparseable rate |
+|---|---|---|
+| 5% (~150 examples) | **15.8%** | 66.4% |
+| 100% (3,080 examples) | **81.6%** | 0.03% |
+
+At 5% of the training data (~31 optimizer steps), LoRA doesn't just
+underperform zero-shot (40.7%) — it's *worse*, and the reason is visible in
+`unparseable_rate`: 66% of outputs weren't even a parseable label, vs. 0.03%
+at full data. This isn't "picked the wrong intent" — too few noisy gradient
+updates broke the model's output formatting before there was enough signal
+to help (`final_train_loss` never converges: 1.58 vs. ~0.13-0.19 for the
+full-data runs). A real, if uncomfortable, finding: a little fine-tuning
+can actively hurt before it helps. Fractions 10%/25%/50% are not yet run.
 
 ### Headline comparison: fine-tuning vs. the best prompting baseline
 
@@ -63,19 +83,22 @@ items). The gap is large enough that this doesn't change the conclusion, but
 it's a simpler test than the rest of the project holds itself to, and it's
 labeled as such rather than presented as equivalent.
 
-The best available config, rank 32, widens this further: **+34.2 points**
-over the best 8-shot prompt (87.0% vs. 52.8%, aggregate two-proportion
-z-test, z=20.65, p≈0). The conclusion — fine-tuning wins decisively — holds
-at every rank tested; the gap only grows as rank increases.
+The best available config, rank 64, widens this further: **+35.0 points**
+over the best 8-shot prompt (87.9% vs. 52.8%, aggregate two-proportion
+z-test, z=21.43, p≈0) — though rank 32 (87.0%, +34.2 points, z=20.65) is
+the more practical recommendation, since rank 64 doesn't significantly beat
+it despite double the parameters. The conclusion — fine-tuning wins
+decisively — holds at every rank tested.
 
 ### What's not done yet
 
-The full designed sweep (5 ranks × 3 seeds, plus a 5-fraction data-efficiency
-curve — 30 LoRA runs total) has not completed; ranks 4 and 8 are real
-(above), ranks 16/32/64 and the data-efficiency curve are not. Real cause: a
-single run costs **~5.3 GPU-hours** on a Kaggle T4, not the ~15-60 seconds
-originally budgeted — the OOM fix needed to fit a 1.5B model on a T4
-(`per_device_batch_size=1`, `gradient_accumulation_steps=16`) trades away
+The full designed rank grid (4/8/16/32/64) is complete and real — see
+above. The 5-fraction data-efficiency curve has one real point (5%, above);
+10%/25%/50% remain (100% is already covered by the rank=8 row). Real cause
+runs are this expensive at all: a full-data run costs **~5.3 GPU-hours** on
+a Kaggle T4, not the ~15-60 seconds originally budgeted — the OOM fix
+needed to fit a 1.5B model on a T4 (`per_device_batch_size=1`,
+`gradient_accumulation_steps=16`) trades away
 GPU parallelism to stay under 15GB, so the real per-run cost is roughly
 300x the original estimate. QLoRA (4-bit, frees weight memory for a bigger
 batch) was tried as a speedup and **measured no improvement** (~5.5h, same
