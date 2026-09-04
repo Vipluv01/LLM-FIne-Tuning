@@ -1,0 +1,21 @@
+[project]
+name = "adapt"
+version = "0.1.0"
+description = "When is fine-tuning actually worth it? A controlled ablation."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy", "scipy",
+    "torch", "transformers", "accelerate", "peft", "bitsandbytes",
+    "datasets", "tqdm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
