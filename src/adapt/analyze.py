@@ -51,6 +51,16 @@ def rank_sweep_table(rows: list[dict]) -> list[dict]:
     for r in rows:
         if r["method"] != "lora" or r.get("lora_rank") is None:
             continue
+        # A rank ablation holds train_fraction fixed at 1.0 by construction
+        # (config.rank_sweep_runs always sets it) -- without this filter, a
+        # data-efficiency row at the same rank but a tiny train_fraction
+        # (e.g. lora_r8_frac0.05_seed0) silently gets averaged in as if it
+        # were another full-data seed of that rank, corrupting the mean and
+        # blowing up the std. Only triggers once both axes are populated
+        # for the same rank in the same results file, which is why this
+        # went uncaught until real data actually exercised it.
+        if float(r.get("train_fraction", 1.0)) != 1.0:
+            continue
         by_rank.setdefault(r["lora_rank"], []).append(r)
 
     out = []
@@ -83,6 +93,13 @@ def rank_significance_matrix(rows: list[dict]) -> dict[str, tuple[bool, Interval
     by_rank: dict[int, list[str]] = {}
     for r in rows:
         if r["method"] == "lora" and r.get("lora_rank") is not None:
+            # Same fix as rank_sweep_table: a data-efficiency row at this
+            # rank but a non-1.0 train_fraction is a different experiment,
+            # not another seed of the full-data rank ablation -- including
+            # it here risks silently picking a tiny-data run as the
+            # "representative seed" for an adjacent-rank comparison.
+            if float(r.get("train_fraction", 1.0)) != 1.0:
+                continue
             by_rank.setdefault(r["lora_rank"], []).append(r["run_id"])
 
     ranks = sorted(by_rank)
