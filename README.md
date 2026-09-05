@@ -54,6 +54,7 @@ for this task, not rank 64.
 | train fraction | accuracy | unparseable rate |
 |---|---|---|
 | 5% (~150 examples) | **15.8%** | 66.4% |
+| 10% (~300 examples) | **48.0%** | 2.3% |
 | 100% (3,080 examples) | **81.6%** | 0.03% |
 
 At 5% of the training data (~31 optimizer steps), LoRA doesn't just
@@ -62,8 +63,11 @@ underperform zero-shot (40.7%) — it's *worse*, and the reason is visible in
 at full data. This isn't "picked the wrong intent" — too few noisy gradient
 updates broke the model's output formatting before there was enough signal
 to help (`final_train_loss` never converges: 1.58 vs. ~0.13-0.19 for the
-full-data runs). A real, if uncomfortable, finding: a little fine-tuning
-can actively hurt before it helps. Fractions 10%/25%/50% are not yet run.
+full-data runs). By 10% of the data, `unparseable_rate` has recovered to
+2.3% — the formatting breakdown is specific to the very-low-data regime,
+not a persistent problem — but accuracy (48.0%) is still roughly at
+few-shot-prompting levels, well short of the 81.6% full-data result.
+Fractions 25%/50% are not yet run.
 
 ### Headline comparison: fine-tuning vs. the best prompting baseline
 
