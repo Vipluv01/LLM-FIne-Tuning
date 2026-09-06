@@ -55,6 +55,7 @@ for this task, not rank 64.
 |---|---|---|
 | 5% (~150 examples) | **15.8%** | 66.4% |
 | 10% (~300 examples) | **48.0%** | 2.3% |
+| 25% (~770 examples) | **62.2%** | 1.3% |
 | 100% (3,080 examples) | **81.6%** | 0.03% |
 
 At 5% of the training data (~31 optimizer steps), LoRA doesn't just
@@ -65,9 +66,9 @@ updates broke the model's output formatting before there was enough signal
 to help (`final_train_loss` never converges: 1.58 vs. ~0.13-0.19 for the
 full-data runs). By 10% of the data, `unparseable_rate` has recovered to
 2.3% — the formatting breakdown is specific to the very-low-data regime,
-not a persistent problem — but accuracy (48.0%) is still roughly at
-few-shot-prompting levels, well short of the 81.6% full-data result.
-Fractions 25%/50% are not yet run.
+not a persistent problem. By 25% of the data, accuracy (62.2%) has cleared
+the best 8-shot prompting baseline (52.8%) by a real margin, though still
+well short of the 81.6% full-data result. Fraction 50% is not yet run.
 
 ### Headline comparison: fine-tuning vs. the best prompting baseline
 
