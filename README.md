@@ -56,19 +56,24 @@ for this task, not rank 64.
 | 5% (~150 examples) | **15.8%** | 66.4% |
 | 10% (~300 examples) | **48.0%** | 2.3% |
 | 25% (~770 examples) | **62.2%** | 1.3% |
+| 50% (~1,540 examples) | **73.8%** | 0.2% |
 | 100% (3,080 examples) | **81.6%** | 0.03% |
 
-At 5% of the training data (~31 optimizer steps), LoRA doesn't just
-underperform zero-shot (40.7%) — it's *worse*, and the reason is visible in
-`unparseable_rate`: 66% of outputs weren't even a parseable label, vs. 0.03%
-at full data. This isn't "picked the wrong intent" — too few noisy gradient
-updates broke the model's output formatting before there was enough signal
-to help (`final_train_loss` never converges: 1.58 vs. ~0.13-0.19 for the
-full-data runs). By 10% of the data, `unparseable_rate` has recovered to
-2.3% — the formatting breakdown is specific to the very-low-data regime,
-not a persistent problem. By 25% of the data, accuracy (62.2%) has cleared
-the best 8-shot prompting baseline (52.8%) by a real margin, though still
-well short of the 81.6% full-data result. Fraction 50% is not yet run.
+**Curve complete.** At 5% of the training data (~31 optimizer steps), LoRA
+doesn't just underperform zero-shot (40.7%) — it's *worse*, and the reason
+is visible in `unparseable_rate`: 66% of outputs weren't even a parseable
+label, vs. 0.03% at full data. This isn't "picked the wrong intent" — too
+few noisy gradient updates broke the model's output formatting before
+there was enough signal to help (`final_train_loss` never converges: 1.58
+vs. ~0.13-0.19 for the full-data runs). By 10% of the data, `unparseable_rate`
+has recovered to 2.3% — the formatting breakdown is specific to the
+very-low-data regime, not a persistent problem. By 25% of the data,
+accuracy (62.2%) has cleared the best 8-shot prompting baseline (52.8%) by
+a real margin. From there the curve shows clear diminishing returns:
+25%→50% gains +11.6 points, 50%→100% gains only +7.8 points for double the
+data — the same shape as the rank ablation above, consistent with a model
+that's extracting most of the available signal well before the full
+dataset.
 
 ### Headline comparison: fine-tuning vs. the best prompting baseline
 
@@ -95,25 +100,31 @@ the more practical recommendation, since rank 64 doesn't significantly beat
 it despite double the parameters. The conclusion — fine-tuning wins
 decisively — holds at every rank tested.
 
-### What's not done yet
+### What's done, and what it cost
 
-The full designed rank grid (4/8/16/32/64) is complete and real — see
-above. The 5-fraction data-efficiency curve has one real point (5%, above);
-10%/25%/50% remain (100% is already covered by the rank=8 row). Real cause
-runs are this expensive at all: a full-data run costs **~5.3 GPU-hours** on
-a Kaggle T4, not the ~15-60 seconds originally budgeted — the OOM fix
-needed to fit a 1.5B model on a T4 (`per_device_batch_size=1`,
-`gradient_accumulation_steps=16`) trades away
+The full originally-designed sweep is complete and real: the 5-rank
+ablation (4/8/16/32/64) and the 5-fraction data-efficiency curve
+(5%/10%/25%/50%/100%), both above. What's still open: extra seeds (most
+configs have 1, not 3) for tighter confidence intervals, and rank=4's true
+per-item array was permanently lost to a session ending before download
+(its aggregate accuracy is still real and used throughout, just without a
+matched per-item comparison — see the caveats above).
+
+Worth documenting because it shaped how this got done: a single full-data
+run costs **~5.3 GPU-hours** on a Kaggle T4, not the ~15-60 seconds
+originally budgeted — the OOM fix needed to fit a 1.5B model on a T4
+(`per_device_batch_size=1`, `gradient_accumulation_steps=16`) trades away
 GPU parallelism to stay under 15GB, so the real per-run cost is roughly
 300x the original estimate. QLoRA (4-bit, frees weight memory for a bigger
 batch) was tried as a speedup and **measured no improvement** (~5.5h, same
-as unquantized) — the OOM was activation memory, not weight memory, so that
-path is a dead end, not just untried. The remaining lever is parallelizing
-across Kaggle (30 free GPU-hr/week) and Colab (a separate quota pool that
-writes results straight to Google Drive rather than local session disk, so
-a session dying mid-run no longer loses progress — see `colab/README.md`)
-— `kaggle/run_sweep.py` and `colab/run_sweep.py` each target one
-`TARGET_RANK` per session for exactly this.
+as unquantized) — the OOM was activation memory, not weight memory, so
+that path was a dead end, not just untried. The sweep that did work:
+parallelizing across Kaggle (30 free GPU-hr/week) and Colab (a separate
+quota pool that writes results straight to Google Drive rather than local
+session disk, so a session dying mid-run doesn't lose progress — see
+`colab/README.md`) — `kaggle/run_sweep.py` and `colab/run_sweep.py` each
+target one `TARGET_RANK` or `TARGET_FRACTION` per session for exactly
+this, run across multiple accounts at once.
 
 
 ## Architecture
